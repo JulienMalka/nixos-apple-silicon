@@ -1,6 +1,8 @@
 { lib
 , fetchFromGitLab
-, mesa }:
+, mesa
+, fakeVersion ? false
+}:
 
 (mesa.override {
   galliumDrivers = [ "swrast" "asahi" ];
@@ -9,7 +11,14 @@
 }).overrideAttrs (oldAttrs: {
   # version must be the same length (i.e. no unstable or date)
   # so that system.replaceRuntimeDependencies can work
-  version = "23.3.0";
+  version = if fakeVersion then oldAttrs.version else "23.3.0";
+
+  postPatch = oldAttrs.postPatch
+    + lib.optionalString fakeVersion ''
+    ${oldAttrs.postPatch}
+    echo ${oldAttrs.version} > VERSION
+  '';
+
   src = fetchFromGitLab {
     # tracking: https://github.com/AsahiLinux/PKGBUILDs/blob/main/mesa-asahi-edge/PKGBUILD
     domain = "gitlab.freedesktop.org";
@@ -36,6 +45,7 @@
 
   # replace disk cache path patch with one tweaked slightly to apply to this version
   patches = lib.forEach oldAttrs.patches
-    (p: if lib.hasSuffix "disk_cache-include-dri-driver-path-in-cache-key.patch" p
+    (p:
+      if lib.hasSuffix "disk_cache-include-dri-driver-path-in-cache-key.patch" p
       then ./disk_cache-include-dri-driver-path-in-cache-key.patch else p);
 })
